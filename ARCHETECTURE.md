@@ -8,15 +8,26 @@ SpudNet operates as a persistent background daemon (Phase 2) that interfaces wit
 
 
 Phase 1:
-    This phase revolves around creataing a "Data Contract" for the LLM to parse.
+    This phase revolves around creating a "Data Contract" for the LLM to parse.
     The following is a JSON structure with the required information:
     ```json
         {
-            timestamp: ISO-8601 string
-            cpu: {usage_pct core_count load_avg}
-            memory: {total_gb avail_gb used_pct} 
-            storage: {path total_gb free_gb fs_type}
-            status: online | warning | critical
+            "timestamp": iso8601,
+            "cpu": {
+                "usage_pct": usage_pct, "core_count": core_count, "load_avg": load_avg
+            },
+            "memory": {
+                "total_gb": total_gb,
+                "avail_gb": avail_gb,
+                "used_pct": used_pct
+            },
+            "storage": {
+                "path": path,
+                "total_gb": total_gb,
+                "free_gb": free_gb,
+                "fs_type": fs_type
+            },
+            "status": "online" | "warning" | "critical"
         }
     ```
     Return that from a function.
