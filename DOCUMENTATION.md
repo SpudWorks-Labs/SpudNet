@@ -33,7 +33,13 @@
       `df` parsing problem. A long name could make it return the wrong line.
     - The skeleton is now finished, now time to test it.
 
+* 19:29
+    - Updated the `Modelfile` and created a script to create the model.
+    - The `create_model.sh` file can be made much more robust.
+
 
 ### TO-DO
+[!] Update the `create_model.sh` to be much more robust.
 [!] Connect the `get_system_info()` output dictionary to the vocal module.
-[!] Fix the `df` parsing problem: Line 77 in `system_monitor.py` with `psutil.disk_partition(all=False)`
+[!] Fix the `df` parsing problem: Line 77 in `system_monitor.py` 
+    with a `psutil.disk_partition(all=False)` iterator.
