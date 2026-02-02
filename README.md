@@ -4,12 +4,7 @@ SpudNet is a system-integrated agentic daemon with a TUI menu that provides hard
 
 
 ### Architecture
-
-SpudNet operates as a persistent background daemon (Phase 2) that interfaces with the Linux kernel via Python, with plans to allow for more devices in the future. The system prioritizes safety through Btrfs snapshots before executing root-level changes, and with human review.
-
-* *Vocal Model:* Powered by the `SpudNet-Vocal` model via Ollama for concise, peer-level technical advice.
-* *Interface:* A high-performance TUI built with `blessed`, featuring real-time command processing.
-* *Hardware Layer:* Utilizes `psutil` and `subprocess` for deep system state awareness. (Phase 1)
+You can view the architecture of the project at the [ARCHITECTURE](ARCHITECTURE.md) file.
 
 
 ### Development Roadmap
