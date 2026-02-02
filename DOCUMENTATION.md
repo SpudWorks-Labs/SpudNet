@@ -35,4 +35,5 @@
 
 
 ### TO-DO
+[!] Connect the `get_system_info()` output dictionary to the vocal module.
 [!] Fix the `df` parsing problem: Line 77 in `system_monitor.py` with `psutil.disk_partition(all=False)`
