@@ -5,9 +5,13 @@ SpudNet is a system-integrated agentic daemon with a TUI menu that provides hard
 
 ### Requirements & Tech
 Python == 3.14.2
+
 blessed == 1.29.0
+
 ollama >= 0.4.0
+
 psutil == 3.3.14
+
 pydantic == 2.12.5
 
 
