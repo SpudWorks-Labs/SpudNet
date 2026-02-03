@@ -46,8 +46,23 @@
     - Fixed the `df` parsing problem by using `psutil.disk_partitions(all=False)`
       and checking for the root mount point.
 
+* 17:00
+    - Updated the `ARCHETECTURE.md` to include "Phase 2" and its requirements.
+
+* 17:03
+    - Created the needed files for Phase 2 and gave them their filestamps:
+        * `server.py`
+        * `database.py`
+    - I need to fix the visuals of "Phase 0; The Terminal" so that the
+      program can look much cleaner.
+
+* 17:09
+    - Created a new branch for Phase 2.
+
 
 ### TO-DO
 [!!!] Have the text area scrollable.
 [!!!] Have the messages appear properly.
 [!!!] Do not let the text pass the text area.
+
+[!] Begin phase 2.
