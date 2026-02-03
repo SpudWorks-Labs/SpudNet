@@ -32,6 +32,7 @@ from blessed import Terminal
 from time import sleep
 
 import vocal
+from system_monitor import get_system_info
 
 
 class SpudNet:
@@ -122,6 +123,7 @@ class SpudNet:
 
         self.messages.append({"speaker": "User: ", "msg": self.break_message("User: ", full_msg)})
         self.render_messages()
+        full_msg = f"[SYSTEM_SNAPSHOT]: {get_system_info()}\n{full_msg}"
         self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", vocal.talk(full_msg))})
         self.render_messages()
 
