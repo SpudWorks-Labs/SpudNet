@@ -37,7 +37,7 @@
     - Updated the `Modelfile` and created a script to create the model.
     - The `create_model.sh` file can be made much more robust.
 
-*2026-02-03*
+*2026/02/03*
 * 04:22
     - Integrated the `get_system_info()` dict into the LLMs prompt.
     - Made the `create_model.sh` more robust and handle errors better.
