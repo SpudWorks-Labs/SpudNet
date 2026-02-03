@@ -1,2 +1,2 @@
-./spudnet/
-./__pycahce__/
+spudnet/
+__pycache__/
