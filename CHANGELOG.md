@@ -37,9 +37,14 @@
     - Updated the `Modelfile` and created a script to create the model.
     - The `create_model.sh` file can be made much more robust.
 
+*2026-02-03*
+* 04:22
+    - Integrated the `get_system_info()` dict into the LLMs prompt.
+    - Made the `create_model.sh` more robust and handle errors better.
+
+* 04:32
+    - Fixed the `df` parsing problem by using `psutil.disk_partitions(all-False)`
+      and checking for the root mount point.
+
 
 ### TO-DO
-[!] Update the `create_model.sh` to be much more robust.
-[!] Connect the `get_system_info()` output dictionary to the vocal module.
-[!] Fix the `df` parsing problem: Line 77 in `system_monitor.py` 
-    with a `psutil.disk_partition(all=False)` iterator.
