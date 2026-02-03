@@ -33,19 +33,28 @@ import ollama
 MODEL = "SpudNet-Vocal"
 
 def talk(msg):
-    streamed = ollama.generate(
-        model=MODEL,
-        prompt=msg,
-        stream=True
-    )
-    response = ""
+    """
+    ~ Send message to the LLM model. ~
+    
+    Returns: 
+        - String                       : The response or an error.
+    """
+    try:
+        streamed = ollama.generate(
+            model=MODEL,
+            prompt=msg,
+            stream=True
+        )
+        response = ""
 
-    for chunk in streamed:
-        response += chunk["response"]
-        # print(chunk['message']['content'], end='', flush=True)
+        for chunk in streamed:
+            response += chunk.get("response", "")
+    
+        return response
+    
+    except ollama.ResponseError as e:
+        return f"[SpudNet error] Model/API: {e.error}"
+    
+    except Exception as e:
+        return f"[SpudNet error] Could not reach Ollama or process response: {e}"
 
-    return response
-
-
-# for word in talk("Hello"):
-#     print(word, end='', flush=True)

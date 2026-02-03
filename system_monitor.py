@@ -81,6 +81,11 @@ def get_storage_info():
         if part.mountpoint == '/':
             fs_type = part.fstype
             path = part.mountpoint
+            break
+    if path is None:
+        path = '/'
+    if fs_type is None:
+        fs_type = "unknown"
 
     return {
         "path": path,
@@ -136,29 +141,29 @@ def get_system_info():
     ~ Get the information for the system. ~
 
     Return:
-        - dict                         : The information for the system.
+        - dict                         : The information or an error dict.
     """
-
-    # ~ Get the CPU information. ~ #
-    cpu_info = get_cpu_info()
-
-    # ~ Get the memory information. ~ #
-    memory_info = get_memory_info()
-
-    # ~ Get the storage information. ~ #
-    storage_info = get_storage_info()
-
-    # ~ Get the status of the system. ~ #
-    status = get_status(cpu_info, memory_info, storage_info)
-
-    # ~ Timestamp the information. ~ #
-    return {
-        "timestamp": datetime.now().isoformat(),
-        "cpu": cpu_info,
-        "memory": memory_info,
-        "storage": storage_info,
-        "status": status
-    }
+    try:
+        cpu_info = get_cpu_info()
+        memory_info = get_memory_info()
+        storage_info = get_storage_info()
+        status = get_status(cpu_info, memory_info, storage_info)
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "cpu": cpu_info,
+            "memory": memory_info,
+            "storage": storage_info,
+            "status": status
+        }
+    except Exception as e:
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "cpu": None,
+            "memory": None,
+            "storage": None,
+            "status": "error",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     print(get_storage_info())

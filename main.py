@@ -28,6 +28,7 @@
 """
 
 
+import json
 from blessed import Terminal
 from time import sleep
 
@@ -123,8 +124,16 @@ class SpudNet:
 
         self.messages.append({"speaker": "User: ", "msg": self.break_message("User: ", full_msg)})
         self.render_messages()
-        full_msg = f"[SYSTEM_SNAPSHOT]: {get_system_info()}\n{full_msg}"
-        self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", vocal.talk(full_msg))})
+
+        try:
+            snapshot = get_system_info()
+            full_msg = f"[SYSTEM_SNAPSHOT]: {json.dumps(snapshot)}\n{full_msg}"
+            reply = vocal.talk(full_msg)
+
+        except Exception as e:
+            reply = f"[SpudNet error] {e}"
+            
+        self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
         self.render_messages()
 
     def execute(self):
