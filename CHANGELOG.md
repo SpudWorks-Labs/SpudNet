@@ -43,8 +43,11 @@
     - Made the `create_model.sh` more robust and handle errors better.
 
 * 04:32
-    - Fixed the `df` parsing problem by using `psutil.disk_partitions(all-False)`
+    - Fixed the `df` parsing problem by using `psutil.disk_partitions(all=False)`
       and checking for the root mount point.
 
 
 ### TO-DO
+[!!!] Have the text area scrollable.
+[!!!] Have the messages appear properly.
+[!!!] Do not let the text pass the text area.
