@@ -74,13 +74,13 @@ def get_storage_info():
     # Get root disk usage info
     root_disk_usage = psutil.disk_usage('/')
 
-    output = subprocess.check_output(['df', '-T', '/']).decode().splitlines()
-    # Assuming the second line contains the data for the root filesystem
-    # Filesystem Type 1G-blocks Used Available Use% Mounted on
-    # /dev/root ext4 249G 6.1G 231G 3% /
-    parts = output[1].split()
-    fs_type = parts[1]
-    path = parts[6]
+    fs_type = None
+    path = None
+
+    for part in psutil.disk_partitions(all=False):
+        if part.mountpoint == '/':
+            fs_type = part.fstype
+            path = part.mountpoint
 
     return {
         "path": path,
@@ -161,4 +161,4 @@ def get_system_info():
     }
 
 if __name__ == "__main__":
-    print(get_system_info())
+    print(get_storage_info())
