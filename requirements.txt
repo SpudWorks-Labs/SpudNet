@@ -1,3 +1,4 @@
 blessed==1.29.0
-psutil==3.3.14
+psutil==7.2.2
 pydantic==2.12.5
+ollama==0.6.1
