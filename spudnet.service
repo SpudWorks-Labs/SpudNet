@@ -1,0 +1,12 @@
+[Unit]
+Descrition=SpudNet Daemon
+After=network.target
+
+[Service]
+User=bruhtato
+WorkingDirectory=/home/bruhtato/Documents/SpudWorks/SpudNet/
+ExecStart=/home/bruhtato/bruhtato/Documents/SpudWorks/SpudNet/spudnet/bin/python server.py
+Restart=Always
+
+[Install]
+WantedBy=multi-user.target
