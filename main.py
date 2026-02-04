@@ -42,6 +42,7 @@ class SpudNet:
         self.welcome = "Welcome to SpudTerminal!"
         self.term = Terminal()
         self.pos = (0, 0)
+        self.scroll_offset = 0 
 
     def create_menu(self):
         x, y = 1, self.term.height-self.term.height//3
@@ -82,12 +83,25 @@ class SpudNet:
         elif cmd == "/kill":
             exit(0)
 
+    def _msg_zone_bottom(self):
+        """
+        ~ First row below the message area (input separator row). ~
+        """
+        return self.term.height - (self.term.height // 3)
+
+    def _visible_line_count(self):
+        """
+        ~ Number of rows available for messages (clipped to zone). ~
+        """
+        return max(0, self._msg_zone_bottom() - 3)
+
     def break_message(self, speaker, full_msg):
         msg = ""
         lines = []
+        max_line_len = self.term.width - (3 + len(speaker))
 
         for word in full_msg.split():
-            if len(msg) + len(word) < self.term.width - (3 + len(speaker)):
+            if len(msg) + len(word) < max_line_len:
                 msg += word + " "
             else:
                 lines.append(msg)
@@ -97,25 +111,64 @@ class SpudNet:
 
         return lines
 
-    def render_messages(self):
-        max_display = (self.term.height - (self.term.height // 3)) - 4
-        visible_messages = self.messages[-max_display:]
-
-        for msg_idx, msg in enumerate(visible_messages):
+    def _all_message_lines(self):
+        """
+        ~ Flatten messages into (speaker, color, line) for each logical line. ~
+        """
+        
+        lines = []
+        
+        for msg in self.messages:
             speaker = msg["speaker"]
-            msg = msg["msg"]
+            color = (255, 0, 0) if speaker == "User: " else (255, 20, 147)
+            for line in msg["msg"]:
+                lines.append((speaker, color, line))
+        return lines
 
-            if speaker == "User: ":
-                color = (255, 0, 0)
+    def render_messages(self):
+        all_lines = self._all_message_lines()
+        total_lines = len(all_lines)
+        visible_count = self._visible_line_count()
+        msg_bottom = self._msg_zone_bottom()
+
+       
+       
+        max_scroll = max(0, total_lines - visible_count)
+        self.scroll_offset = min(self.scroll_offset, max_scroll)
+        self.scroll_offset = max(0, self.scroll_offset)
+
+        for row in range(3, msg_bottom):
+            print(self.term.move_yx(row, 1) + " " * (self.term.width - 2))
+
+        start = self.scroll_offset
+        end = min(start + visible_count, total_lines)
+
+        for i in range(start, end):
+            speaker, color, line = all_lines[i]
+            row = 3 + (i - start)
+            if row >= msg_bottom:
+                break
+                
+            is_first_line = i == 0 or all_lines[i - 1][0] != speaker
+            if is_first_line:
+                prefix = self.term.normal + speaker + self.term.color_rgb(*color)
+                max_line_len = self.term.width - 2 - len(speaker)
             else:
-                color = (255, 20, 147)
+                prefix = self.term.color_rgb(*color)
+                max_line_len = self.term.width - 2
+                
+            if len(line) > max_line_len:
+                line = line[:max_line_len]
+            print(self.term.move_yx(row, 1) + prefix + line)
 
-            for line_idx, line in enumerate(msg):
-                if line_idx == 0:
-                    print(self.term.move_yx((3 + msg_idx) + line_idx, 1) + self.term.normal + speaker + self.term.color_rgb(*color) + line)
-
-                else:
-                    print(self.term.move_yx((3 + msg_idx) + line_idx, 1) + self.term.color_rgb(*color) + line)
+    def _scroll_to_bottom(self):
+        """
+        ~ Keep scroll at bottom (e.g. after new messages). ~
+        """
+        
+        total = len(self._all_message_lines())
+        visible = self._visible_line_count()
+        self.scroll_offset = max(0, total - visible)
 
     def add_message(self, full_msg):
         if full_msg.startswith("/"):
@@ -123,6 +176,7 @@ class SpudNet:
             return
 
         self.messages.append({"speaker": "User: ", "msg": self.break_message("User: ", full_msg)})
+        self._scroll_to_bottom()
         self.render_messages()
 
         try:
@@ -132,8 +186,9 @@ class SpudNet:
 
         except Exception as e:
             reply = f"[SpudNet error] {e}"
-            
+
         self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
+        self._scroll_to_bottom()
         self.render_messages()
 
     def execute(self):
@@ -155,6 +210,22 @@ class SpudNet:
 
                 if key.code == self.term.KEY_ESCAPE:
                     break
+                    
+                if key.code == self.term.KEY_PGUP:
+                    visible = self._visible_line_count()
+                    self.scroll_offset = max(0, self.scroll_offset - visible)
+                    self.render_messages()
+                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + input_buffer[-input_display_length:] + self.term.normal + " ", end="")
+                    print(self.term.move_yx(self.pos[1], self.pos[0] + len(input_buffer[-input_display_length:])), end="", flush=True)
+                    continue
+                if key.code == self.term.KEY_PGDOWN:
+                    visible = self._visible_line_count()
+                    total = len(self._all_message_lines())
+                    self.scroll_offset = min(max(0, total - visible), self.scroll_offset + visible)
+                    self.render_messages()
+                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + input_buffer[-input_display_length:] + self.term.normal + " ", end="")
+                    print(self.term.move_yx(self.pos[1], self.pos[0] + len(input_buffer[-input_display_length:])), end="", flush=True)
+                    continue
                 if key.code == self.term.KEY_ENTER:
                     loc_y, loc_x = self.term.get_location()
                     chars = loc_x - self.pos[0]

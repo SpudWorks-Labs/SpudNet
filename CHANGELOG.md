@@ -44,10 +44,25 @@
 
 * 04:32
     - Fixed the `df` parsing problem by using `psutil.disk_partitions(all=False)`
-      and checking for the root mount point.
+      and checking for 
+      
+*2026/02/04*
+* 03:29
+    - Fixed multi-lined messages so they stack properly.
+    - Continuing to test to see if the other two issues have been fixed.
 
+* 03:32
+    - Responses take a very long time. There might 
+      be a latency issue within the pipeline.
+    
+* 03:35
+    - The text does not leave the text field, but the text is not able to be
+      scrolled through
+
+* 03:46
+    - The scrolling issue was caused by the AI suggesting to use 
+      the `PAGEUP` and `PAGEDOWN` attributes in `self.term` but the correct
+      attributes are: `PGUP` and `PGDOWN`.
 
 ### TO-DO
-[!!!] Have the text area scrollable.
-[!!!] Have the messages appear properly.
-[!!!] Do not let the text pass the text area.
+[!!!] Find and fix response latency issues.
