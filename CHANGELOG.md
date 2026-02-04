@@ -98,4 +98,10 @@
 
 
 ### TO-DO
+[!] Implement the following commands:
+    * `/history`: 
+        - Call `database.get_recent_metrics()`.
+    * `/chat`:
+        - Call `log_system_stats()` for the database.
 
+[!] Create a systemd.
