@@ -69,7 +69,58 @@
       the power of a CPU.
 
 * 05:37
-    - Added the `databse.py` and `server.py` for Phase 2.
+    - Added the `database.py` and `server.py` for Phase 2.
     
+* 07:30
+    - Things are "functional" but the issue is how the response is returned.
+    - The response is a large, recursive garbled string.
 
 ### TO-DO
+[!!!!!] Make the response actually legible and not recursive.
+    * Possible Fix:
+        Update `main._get_llm_response()`:
+            - This method only sends he new piece of text instead of the cumulative history.
+            ```python
+            async def _get_llm_response(self, user_msg):
+            try:
+                # ... (keep snapshot logic) ...
+                response = requests.post(f"{self.api_url}/chat", json={"message": full_msg_with_snapshot}, stream=True)
+                response.raise_for_status()
+
+                # Send chunks individually as they arrive
+                for chunk in response.iter_content(chunk_size=None):
+                    if chunk:
+                        await self.llm_response_queue.put(chunk.decode("utf-8"))
+
+            except Exception as e:
+                await self.llm_response_queue.put(f"[SpudNet error] {e}")
+            ```
+
+        Update `main.execute()`:
+            - Queue processing logic needs to update the last message if it
+              belongs to SpudNet, rather than creating a new one.
+            ```python
+            # Inside the 'while not self.llm_response_queue.empty():' block
+            reply_chunk = await self.llm_response_queue.get()
+
+            # If the last message is from SpudNet, append the chunk to it
+            if self.messages and self.messages[-1]["speaker"] == "SpudNet: ":
+                # Use a 'raw' key to store the un-wrapped text for clean appending
+                if "raw" not in self.messages[-1]:
+                    self.messages[-1]["raw"] = "".join(self.messages[-1]["msg"])
+                
+                self.messages[-1]["raw"] += reply_chunk
+                self.messages[-1]["msg"] = self.break_message("SpudNet: ", self.messages[-1]["raw"])
+            else:
+                # Otherwise, create the first entry for this response
+                self.messages.append({
+                    "speaker": "SpudNet: ", 
+                    "msg": self.break_message("SpudNet: ", reply_chunk),
+                    "raw": reply_chunk
+                })
+
+            self._scroll_to_bottom()
+            self.render_messages()
+            ```
+[!!!] Switch from `requests` to `httpx.AyncClient` in `main.py`. 
+
