@@ -55,22 +55,24 @@ async def async_talk(msg):
             )
             response.raise_for_status()
 
-            full_response = ""
+            json_buffer = ""
             async for chunk_bytes in response.aiter_bytes():
                 chunk_str = chunk_bytes.decode('utf-8')
-                for line in chunk_str.splitlines():
+                json_buffer += chunk_str
+
+                while '\n' in json_buffer:
+                    line, json_buffer = json_buffer.split('\n', 1)
                     if line.strip():
                         try:
                             chunk_data = json.loads(line)
-                            full_response += chunk_data.get("response", "")
+                            if "response" in chunk_data:
+                                yield chunk_data["response"]
                         except json.JSONDecodeError:
-                            # Handle cases where a line might not be a complete JSON object
                             pass
-            return full_response
     
     except httpx.RequestError as e:
-        return f"[SpudNet error] HTTP Request failed: {e}"
+        yield f"[SpudNet error] HTTP Request failed: {e}"
     except httpx.HTTPStatusError as e:
-        return f"[SpudNet error] HTTP Status Error: {e.response.status_code} - {e.response.text}" 
+        yield f"[SpudNet error] HTTP Status Error: {e.response.status_code} - {e.response.text}" 
     except Exception as e:
-        return f"[SpudNet error] Could not reach Ollama or process response: {e}"
+        yield f"[SpudNet error] Could not reach Ollama or process response: {e}"

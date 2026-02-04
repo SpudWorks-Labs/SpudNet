@@ -32,12 +32,9 @@ import asyncio
 import json
 from blessed import Terminal
 from time import sleep
-
-import vocal
-from system_monitor import get_system_info
+import requests
 import textwrap
 
-llm_response_queue = asyncio.Queue()
 
 
 class SpudNet:
@@ -50,6 +47,16 @@ class SpudNet:
         self._last_rendered_lines = []
         self._last_system_snapshot = None
         self._last_snapshot_time = 0
+        self.api_url = "http://127.0.0.1:8000"
+        self.llm_response_queue = asyncio.Queue()
+
+    async def get_system_info(self):
+        try:
+            response = requests.get(f"{self.api_url}/status")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Failed to get system status: {e}"}
 
     def create_menu(self):
         x, y = 1, self.term.height-self.term.height//3
@@ -182,16 +189,25 @@ class SpudNet:
             # Cache system info, update every 5 seconds
             current_time = asyncio.get_event_loop().time()
             if self._last_system_snapshot is None or (current_time - self._last_snapshot_time) > 5:
-                self._last_system_snapshot = get_system_info()
+                self._last_system_snapshot = await self.get_system_info()
                 self._last_snapshot_time = current_time
             
             full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n{user_msg}"
-            reply = await vocal.async_talk(full_msg_with_snapshot)
+            
+            response = requests.post(f"{self.api_url}/chat", json={"message": full_msg_with_snapshot}, stream=True)
+            response.raise_for_status()
+
+            reply_content = []
+            for chunk in response.iter_content(chunk_size=None):
+                if chunk:
+                    reply_content.append(chunk.decode("utf-8"))
+                    await self.llm_response_queue.put("".join(reply_content)) # Update the queue with partial response
+            reply = "".join(reply_content)
 
         except Exception as e:
             reply = f"[SpudNet error] {e}"
         
-        await llm_response_queue.put(reply)
+        await self.llm_response_queue.put(reply)
 
     async def execute(self):
         with self.term.fullscreen(), self.term.cbreak():
@@ -202,8 +218,8 @@ class SpudNet:
 
             while True:
                 # Process LLM responses from the queue
-                while not llm_response_queue.empty():
-                    reply = await llm_response_queue.get()
+                while not self.llm_response_queue.empty():
+                    reply = await self.llm_response_queue.get()
                     self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
                     self._scroll_to_bottom()
                     self.render_messages()
