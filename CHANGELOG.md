@@ -68,4 +68,8 @@
     - Fixed and updated latency issues with `asyncio`, now still constrained by
       the power of a CPU.
 
+* 05:37
+    - Added the `databse.py` and `server.py` for Phase 2.
+    
+
 ### TO-DO
