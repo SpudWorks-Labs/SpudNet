@@ -96,7 +96,12 @@
     - The "[SpudNet Error]" has been resolved and now
       Phase 2 is closer to being done.
 
+* 20:31
+    - Now saves to the database and has a history.
+    - Need to implement a "recall" feature.
+
 
 ### TO-DO
-[!] Implement the history and log saving.
-[!] Create a systemd.
+[!] Recall information from the database.
+[!] Update the README for proper installation and reflection
+    of changes if need be.
