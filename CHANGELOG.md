@@ -92,7 +92,10 @@
     - I have also included a `/reload` command for quicker
       program reloading.
 
+* 19:16
+    - The "[SpudNet Error]" has been resolved and now
+      Phase 2 is closer to being done.
+
 
 ### TO-DO
-[!!!!!!] Fix the "[SpudNet Error]".
 

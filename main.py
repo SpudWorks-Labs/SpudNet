@@ -50,14 +50,14 @@ class SpudNet:
         self._last_snapshot_time = 0
         self.api_url = "http://127.0.0.1:8000"
         self.llm_response_queue = asyncio.Queue()
+        self.client = httpx.AsyncClient(timeout=None)
 
     async def get_system_info(self):
         try:
-            async with httpx.AsyncClient() as client:
-
-                response = await client.get(f"{self.api_url}/status")
-                response.raise_for_status()
-                return response.json()
+            response = await self.client.get(f"{self.api_url}/status")
+            response.raise_for_status()
+                
+            return response.json()
         except httpx.RequestError as re:
             return {"error": f"A RequestError has occured: {re}"}
         except httpx.HTTPStatusError as se:
@@ -200,34 +200,39 @@ class SpudNet:
                 self._last_system_snapshot = await self.get_system_info()
                 self._last_snapshot_time = current_time
             
-            full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n{user_msg}"
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.api_url}/chat", json={
-                        "message": full_msg_with_snapshot
-                    }
-                    # stream=True
-                )
-            
-                response.raise_for_status()
+            full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n[USER]: {user_msg}"
 
-                reply = ""
+            async with self.client.stream(
+                "POST",
+                f"{self.api_url}/chat", json={
+                    "message": full_msg_with_snapshot
+                }) as response:
+
+                if response.status_code != 200:
+                    await self.llm_response_queue.put(f"[SpudNet Error] Server returned {response.status_code}")
+                    return
+
                 async for chunk in response.aiter_bytes():
                     if chunk:
                         decoded_chunk = chunk.decode("utf-8")
-                        reply += decoded_chunk # Accumulate the reply
                         await self.llm_response_queue.put(decoded_chunk) # Send individual chunks for real-time display
 
+        except httpx.RequestError as re:
+            await self.llm_response_queue.put(f"[SpudNet Error] httpx request error: {re}")
+
+        except httpx.HTTPStatusError as se:
+            await self.llm_response_queue.put(f"[SpudNet Error] httpx status error: {se}")
+
         except Exception as e:
-            reply = f"[SpudNet Error] {e if str(e) else 'An unknown error occurred.'}"
+            await self.llm_response_queue.put(f"[SpudNet Error] {e if str(e) else 'An unknown error occurred.'}")
         
-        await self.llm_response_queue.put(reply)
+        #await self.llm_response_queue.put(reply)
 
     async def execute(self):
         with self.term.fullscreen(), self.term.cbreak():
             input_buffer = ""
             lastwidth, last_height = self.term.width, self.term.height
+            input_display_length = 0
             
             self.render()
 

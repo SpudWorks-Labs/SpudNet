@@ -79,7 +79,7 @@ def log_system_stats(stats_dict):
     """
 
     conn = get_connection()
-    timestamp = stats_dict.get("timestamp", datetime,now().isoformat())
+    timestamp = stats_dict.get("timestamp", datetime.now().isoformat())
 
     with conn:
         conn.execute(
@@ -114,7 +114,7 @@ def get_recent_metrics(limit=10):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT data FROM hardware_metrics ORDER BY id BY DESC LIMIT ?",
+        "SELECT data FROM hardware_metrics ORDER BY id DESC LIMIT ?",
         (limit,)
     )
 

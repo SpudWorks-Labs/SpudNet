@@ -88,4 +88,4 @@ if __name__ == "__main__":
     try:
         uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
     except Exception as e:
-        print("There has been an error: {e}")
+        print(f"There has been an error: {e}")
