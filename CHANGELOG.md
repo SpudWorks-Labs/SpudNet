@@ -51,21 +51,23 @@
     - Fixed multi-lined messages so they stack properly.
     - Continuing to test to see if the other two issues have been fixed.
 
-* 03:32
-    - Responses take a very long time. There might 
-      be a latency issue within the pipeline.
-    
-* 03:35
-    - The text does not leave the text field, but the text is not able to be
-      scrolled through
+* 17:00
+    - Updated the `ARCHETECTURE.md` to include "Phase 2" and its requirements.
 
-* 03:46
-    - The scrolling issue was caused by the AI suggesting to use 
-      the `PAGEUP` and `PAGEDOWN` attributes in `self.term` but the correct
-      attributes are: `PGUP` and `PGDOWN`.
+* 17:03
+    - Created the needed files for Phase 2 and gave them their filestamps:
+        * `server.py`
+        * `database.py`
+    - I need to fix the visuals of "Phase 0; The Terminal" so that the
+      program can look much cleaner.
 
-* 05:09
-    - Fixed and updated latency issues with `asyncio`, now still constrained by
-      the power of a CPU.
+* 17:09
+    - Created a new branch for Phase 2.
+
 
 ### TO-DO
+[!!!] Have the text area scrollable.
+[!!!] Have the messages appear properly.
+[!!!] Do not let the text pass the text area.
+
+[!] Begin phase 2.
