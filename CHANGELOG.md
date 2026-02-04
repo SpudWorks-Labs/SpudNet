@@ -75,52 +75,24 @@
     - Things are "functional" but the issue is how the response is returned.
     - The response is a large, recursive garbled string.
 
+* 16:03
+    - Implementing the possible fixes and naively hoping nothing goes wrong.
+    - Beginning to update the `main._get_llm_response()` method to only
+      send the new piece of text insteaf of the cumulative history.
+
+* 16:09
+    - The `_get_llm_response()` method now correctly accumulates the LLM's response chunks and streams them individually to the queue, and the `main.execute()` method has been updated to correctly consolidate these chunks into a single, coherent message for display.
+    
+* 16:26
+    - Switching from `requests` to `httpx.AsyncClient` in `main.py`.
+
+* 16:52
+    - I have finished the switch, but now SpudNet keeps responding
+      with "[SpudNet Error]" which certainly needs to be solved.
+    - I have also included a `/reload` command for quicker
+      program reloading.
+
+
 ### TO-DO
-[!!!!!] Make the response actually legible and not recursive.
-    * Possible Fix:
-        Update `main._get_llm_response()`:
-            - This method only sends he new piece of text instead of the cumulative history.
-            ```python
-            async def _get_llm_response(self, user_msg):
-            try:
-                # ... (keep snapshot logic) ...
-                response = requests.post(f"{self.api_url}/chat", json={"message": full_msg_with_snapshot}, stream=True)
-                response.raise_for_status()
-
-                # Send chunks individually as they arrive
-                for chunk in response.iter_content(chunk_size=None):
-                    if chunk:
-                        await self.llm_response_queue.put(chunk.decode("utf-8"))
-
-            except Exception as e:
-                await self.llm_response_queue.put(f"[SpudNet error] {e}")
-            ```
-
-        Update `main.execute()`:
-            - Queue processing logic needs to update the last message if it
-              belongs to SpudNet, rather than creating a new one.
-            ```python
-            # Inside the 'while not self.llm_response_queue.empty():' block
-            reply_chunk = await self.llm_response_queue.get()
-
-            # If the last message is from SpudNet, append the chunk to it
-            if self.messages and self.messages[-1]["speaker"] == "SpudNet: ":
-                # Use a 'raw' key to store the un-wrapped text for clean appending
-                if "raw" not in self.messages[-1]:
-                    self.messages[-1]["raw"] = "".join(self.messages[-1]["msg"])
-                
-                self.messages[-1]["raw"] += reply_chunk
-                self.messages[-1]["msg"] = self.break_message("SpudNet: ", self.messages[-1]["raw"])
-            else:
-                # Otherwise, create the first entry for this response
-                self.messages.append({
-                    "speaker": "SpudNet: ", 
-                    "msg": self.break_message("SpudNet: ", reply_chunk),
-                    "raw": reply_chunk
-                })
-
-            self._scroll_to_bottom()
-            self.render_messages()
-            ```
-[!!!] Switch from `requests` to `httpx.AyncClient` in `main.py`. 
+[!!!!!!] Fix the "[SpudNet Error]".
 
