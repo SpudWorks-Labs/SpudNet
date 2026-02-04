@@ -32,9 +32,10 @@ import asyncio
 import json
 from blessed import Terminal
 from time import sleep
-import requests
+import httpx
 import textwrap
-
+import os
+import sys
 
 
 class SpudNet:
@@ -52,11 +53,17 @@ class SpudNet:
 
     async def get_system_info(self):
         try:
-            response = requests.get(f"{self.api_url}/status")
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            return {"error": f"Failed to get system status: {e}"}
+            async with httpx.AsyncClient() as client:
+
+                response = await client.get(f"{self.api_url}/status")
+                response.raise_for_status()
+                return response.json()
+        except httpx.RequestError as re:
+            return {"error": f"A RequestError has occured: {re}"}
+        except httpx.HTTPStatusError as se:
+            return {"error": f"A Status Error has occured: {se}"}
+        except Exception as e:
+            return {"error": f"A general exception has occured: {e}"}
 
     def create_menu(self):
         x, y = 1, self.term.height-self.term.height//3
@@ -93,6 +100,9 @@ class SpudNet:
 
         elif cmd == "/kill":
             exit(0)
+
+        elif cmd == "/reload":
+            os.execv(sys.executable, ['python'] + sys.argv)
 
     def _msg_zone_bottom(self):
         """
@@ -134,8 +144,6 @@ class SpudNet:
         visible_count = self._visible_line_count()
         msg_bottom = self._msg_zone_bottom()
 
-       
-       
         max_scroll = max(0, total_lines - visible_count)
         self.scroll_offset = min(self.scroll_offset, max_scroll)
         self.scroll_offset = max(0, self.scroll_offset)
@@ -194,18 +202,25 @@ class SpudNet:
             
             full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n{user_msg}"
             
-            response = requests.post(f"{self.api_url}/chat", json={"message": full_msg_with_snapshot}, stream=True)
-            response.raise_for_status()
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.api_url}/chat", json={
+                        "message": full_msg_with_snapshot
+                    }
+                    # stream=True
+                )
+            
+                response.raise_for_status()
 
-            reply_content = []
-            for chunk in response.iter_content(chunk_size=None):
-                if chunk:
-                    reply_content.append(chunk.decode("utf-8"))
-                    await self.llm_response_queue.put("".join(reply_content)) # Update the queue with partial response
-            reply = "".join(reply_content)
+                reply = ""
+                async for chunk in response.aiter_bytes():
+                    if chunk:
+                        decoded_chunk = chunk.decode("utf-8")
+                        reply += decoded_chunk # Accumulate the reply
+                        await self.llm_response_queue.put(decoded_chunk) # Send individual chunks for real-time display
 
         except Exception as e:
-            reply = f"[SpudNet error] {e}"
+            reply = f"[SpudNet Error] {e if str(e) else 'An unknown error occurred.'}"
         
         await self.llm_response_queue.put(reply)
 
@@ -219,8 +234,24 @@ class SpudNet:
             while True:
                 # Process LLM responses from the queue
                 while not self.llm_response_queue.empty():
-                    reply = await self.llm_response_queue.get()
-                    self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
+                    reply_chunk = await self.llm_response_queue.get()
+
+                    # If the last message is from SpudNet, append the chunk to it
+                    if self.messages and self.messages[-1]["speaker"] == "SpudNet: ":
+                        # Use a 'raw' key to store the un-wrapped text for clean appending
+                        if "raw" not in self.messages[-1]:
+                            self.messages[-1]["raw"] = "".join(self.messages[-1]["msg"])
+                        
+                        self.messages[-1]["raw"] += reply_chunk
+                        self.messages[-1]["msg"] = self.break_message("SpudNet: ", self.messages[-1]["raw"])
+                    else:
+                        # Otherwise, create the first entry for this response
+                        self.messages.append({
+                            "speaker": "SpudNet: ", 
+                            "msg": self.break_message("SpudNet: ", reply_chunk),
+                            "raw": reply_chunk
+                        })
+
                     self._scroll_to_bottom()
                     self.render_messages()
                     # Re-render the input line and reposition the cursor after an LLM response
