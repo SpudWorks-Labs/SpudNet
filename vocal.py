@@ -1,5 +1,5 @@
 """
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
                         Program Name: Live Translate.
       Description: A helpful AI Assistent that act as the host device.
@@ -24,37 +24,53 @@
         You should have received a copy of the GNU Affero General Public License
         along with this program. If not, see <https://www.gnu.org/licenses/>
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
 
-import ollama
+import asyncio
+import httpx
+import json
 
-MODEL = "SpudNet-Vocal"
+MODEL = "SpudNet-Vocal:latest"
+OLLAMA_API_BASE_URL = "http://localhost:11434/api/generate"
 
-def talk(msg):
+async def async_talk(msg):
     """
-    ~ Send message to the LLM model. ~
+    ~ Asynchronously send message to the LLM model. ~
     
     Returns: 
         - String                       : The response or an error.
     """
     try:
-        streamed = ollama.generate(
-            model=MODEL,
-            prompt=msg,
-            stream=True
-        )
-        response = ""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                OLLAMA_API_BASE_URL,
+                json={
+                    "model": MODEL,
+                    "prompt": msg,
+                    "stream": True
+                },
+                timeout=None  # Disable timeout for long-running LLM calls
+            )
+            response.raise_for_status()
 
-        for chunk in streamed:
-            response += chunk.get("response", "")
+            full_response = ""
+            async for chunk_bytes in response.aiter_bytes():
+                chunk_str = chunk_bytes.decode('utf-8')
+                for line in chunk_str.splitlines():
+                    if line.strip():
+                        try:
+                            chunk_data = json.loads(line)
+                            full_response += chunk_data.get("response", "")
+                        except json.JSONDecodeError:
+                            # Handle cases where a line might not be a complete JSON object
+                            pass
+            return full_response
     
-        return response
-    
-    except ollama.ResponseError as e:
-        return f"[SpudNet error] Model/API: {e.error}"
-    
+    except httpx.RequestError as e:
+        return f"[SpudNet error] HTTP Request failed: {e}"
+    except httpx.HTTPStatusError as e:
+        return f"[SpudNet error] HTTP Status Error: {e.response.status_code} - {e.response.text}" 
     except Exception as e:
         return f"[SpudNet error] Could not reach Ollama or process response: {e}"
-

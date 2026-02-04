@@ -28,12 +28,16 @@
 """
 
 
+import asyncio
 import json
 from blessed import Terminal
 from time import sleep
 
 import vocal
 from system_monitor import get_system_info
+import textwrap
+
+llm_response_queue = asyncio.Queue()
 
 
 class SpudNet:
@@ -43,6 +47,9 @@ class SpudNet:
         self.term = Terminal()
         self.pos = (0, 0)
         self.scroll_offset = 0 
+        self._last_rendered_lines = []
+        self._last_system_snapshot = None
+        self._last_snapshot_time = 0
 
     def create_menu(self):
         x, y = 1, self.term.height-self.term.height//3
@@ -64,12 +71,9 @@ class SpudNet:
         return (x, y)
 
     def render_title(self):
-        x, y = self.term.width//3, 1
-
-        for char in self.welcome:
-            print(self.term.move_yx(y, x) + char)
-            x += 1
-            sleep(0.05)
+        x = (self.term.width // 2) - (len(self.welcome) // 2)
+        y = 1
+        print(self.term.move_yx(y, x) + self.welcome)
 
     def render(self):
         self.pos = self.create_menu()
@@ -96,20 +100,12 @@ class SpudNet:
         return max(0, self._msg_zone_bottom() - 3)
 
     def break_message(self, speaker, full_msg):
-        msg = ""
-        lines = []
         max_line_len = self.term.width - (3 + len(speaker))
-
-        for word in full_msg.split():
-            if len(msg) + len(word) < max_line_len:
-                msg += word + " "
-            else:
-                lines.append(msg)
-                msg = word + " "
-
-        lines.append(msg)
-
+        lines = textwrap.wrap(full_msg, max_line_len, break_long_words=False, replace_whitespace=True)
         return lines
+
+    def _display_len(self, text):
+        return len(text)
 
     def _all_message_lines(self):
         """
@@ -179,19 +175,25 @@ class SpudNet:
         self._scroll_to_bottom()
         self.render_messages()
 
+        asyncio.create_task(self._get_llm_response(full_msg))
+
+    async def _get_llm_response(self, user_msg):
         try:
-            snapshot = get_system_info()
-            full_msg = f"[SYSTEM_SNAPSHOT]: {json.dumps(snapshot)}\n{full_msg}"
-            reply = vocal.talk(full_msg)
+            # Cache system info, update every 5 seconds
+            current_time = asyncio.get_event_loop().time()
+            if self._last_system_snapshot is None or (current_time - self._last_snapshot_time) > 5:
+                self._last_system_snapshot = get_system_info()
+                self._last_snapshot_time = current_time
+            
+            full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n{user_msg}"
+            reply = await vocal.async_talk(full_msg_with_snapshot)
 
         except Exception as e:
             reply = f"[SpudNet error] {e}"
+        
+        await llm_response_queue.put(reply)
 
-        self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
-        self._scroll_to_bottom()
-        self.render_messages()
-
-    def execute(self):
+    async def execute(self):
         with self.term.fullscreen(), self.term.cbreak():
             input_buffer = ""
             lastwidth, last_height = self.term.width, self.term.height
@@ -199,6 +201,18 @@ class SpudNet:
             self.render()
 
             while True:
+                # Process LLM responses from the queue
+                while not llm_response_queue.empty():
+                    reply = await llm_response_queue.get()
+                    self.messages.append({"speaker": "SpudNet: ", "msg": self.break_message("SpudNet: ", reply)})
+                    self._scroll_to_bottom()
+                    self.render_messages()
+                    # Re-render the input line and reposition the cursor after an LLM response
+                    scrolled_input = input_buffer[-input_display_length:]
+                    cursor_x = self.pos[0] + self._display_len(scrolled_input)
+                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + scrolled_input + self.term.normal + " " * (input_display_length - self._display_len(scrolled_input)), end="")
+                    print(self.term.move_yx(self.pos[1], cursor_x), end="", flush=True)
+
                 input_display_length = self.term.width - 10
 
                 if (self.term.width, self.term.height) != (lastwidth, last_height):
@@ -206,7 +220,8 @@ class SpudNet:
 
                     self.render()
                 
-                key = self.term.inkey(timeout=0.1)
+                key = self.term.inkey(timeout=0.5)
+                await asyncio.sleep(0) # Allow other async tasks to run
 
                 if key.code == self.term.KEY_ESCAPE:
                     break
@@ -232,8 +247,7 @@ class SpudNet:
                     
                     self.add_message(input_buffer)
 
-                    print(self.term.move_xy(self.pos[0], self.pos[1]), end="", flush=True)
-                    print(" " * chars)
+                    print(self.term.move_xy(self.pos[0], self.pos[1]) + " " * chars)
 
                     input_buffer = ""
 
@@ -257,7 +271,7 @@ class SpudNet:
                     input_buffer += key
 
                 scrolled_input = input_buffer[-input_display_length:]
-                cursor_x = self.pos[0] + len(scrolled_input)
+                cursor_x = self.pos[0] + self._display_len(scrolled_input)
 
                 print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + scrolled_input + self.term.normal + " ", end="")
                 print(self.term.move_yx(self.pos[1], cursor_x), end="", flush=True)
@@ -265,5 +279,4 @@ class SpudNet:
 
 if __name__ == '__main__':
     spudnet = SpudNet()
-
-    spudnet.execute()
+    asyncio.run(spudnet.execute())

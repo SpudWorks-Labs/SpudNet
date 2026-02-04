@@ -64,5 +64,8 @@
       the `PAGEUP` and `PAGEDOWN` attributes in `self.term` but the correct
       attributes are: `PGUP` and `PGDOWN`.
 
+* 05:09
+    - Fixed and updated latency issues with `asyncio`, now still constrained by
+      the power of a CPU.
+
 ### TO-DO
-[!!!] Find and fix response latency issues.
