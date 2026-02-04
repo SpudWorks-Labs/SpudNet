@@ -114,7 +114,7 @@ def get_recent_metrics(limit=10):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT data FROM hardware_metrics ORDER BY od BY DESC LIMIT ?",
+        "SELECT data FROM hardware_metrics ORDER BY id BY DESC LIMIT ?",
         (limit,)
     )
 
