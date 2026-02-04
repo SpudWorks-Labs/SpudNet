@@ -124,5 +124,23 @@ def get_recent_metrics(limit=10):
     return [json.loads(row[0]) for row in rows]
 
 
+def get_recent_conversations(limit=20):
+    """
+    ~ Retrieves the last N chat pairs. ~
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT timestamp, user_msg, spudnet_msg FROM conversations ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [{"timestamp": r[0], "user": r[1], "spudnet": r[2]} for r in rows]
+
 if __name__ == "__main__":
     init_db()

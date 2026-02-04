@@ -48,38 +48,43 @@ class ChatRequest(BaseModel):
 @app.get('/status')
 async def get_system_status():
     """
-    ~ Get the status of the system. ~
-
-    Returns:
-        Dict                           : The JSON of the system status.
+    ~ Get the status and log it for trend analysis. ~
     """
 
-    return system_monitor.get_system_info()
+    stats = system_monitor.get_system_info()
+    database.log_system_stats(stats)
+
+    return stats
 
 
 @app.post('/chat')
 async def chat_stream(request: ChatRequest):
     """
-    ~ Streams the vocal model's response directly to the client.
-      Using text/plain allows the client to print chunks as they arrive. ~
-
-    Returns:
-        Generator                      : The streaming chunks buffer.
+    ~ Streams responses and saves conversations to DB upon completion. ~
     """
 
-    return StreamingResponse(vocal.async_talk(request.message), media_type="text/plain")
+    async def saving_generator(msg):
+        full_response = ""
+
+        async for chunk in vocal.async_talk(msg):
+            full_response += chunk
+            yield chunk
+
+        database.log_chat(msg, full_response)
+
+    return StreamingResponse(saving_generator(request.message), media_type="text/plain")
 
 
 @app.get('/history')
 async def get_history():
     """
-    ~ Placeholder for database retrieval. ~
-
-    Returns:
-        Dict                           : A placeholder for functionality.
+    ~ Retrieve the last 10 snapshots and conversations. ~
     """
 
-    return {"message": "Not implemented yet. Connect database.py first."}
+    return {
+        "hardware_history": database.get_recent_metrics(limit=10),
+        "chat_history": database.get_recent_chats(limit=10)
+    }
 
 
 if __name__ == "__main__":
