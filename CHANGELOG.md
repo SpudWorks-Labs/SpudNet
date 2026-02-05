@@ -100,8 +100,16 @@
     - Now saves to the database and has a history.
     - Need to implement a "recall" feature.
 
+* 16:06
+    - Beginning to update the README and other docs.
+
+* 16:33
+    - Renamed `server.py` to `brain.py` for a more "alive" feel.
+
 
 ### TO-DO
 [!] Recall information from the database.
 [!] Update the README for proper installation and reflection
     of changes if need be.
+[!] Have the server check if the ollama server is running.
+    If not, start it up.
