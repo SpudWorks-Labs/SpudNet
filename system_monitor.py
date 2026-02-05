@@ -1,11 +1,11 @@
 """
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
-                        Program Name: Live Translate.
-      Description: A helpful AI Assistent that act as the host device.
+                        Program Name: SpudNet.
+      Description: A helpful AI Assistant that act as the host device.
                          File: system_monitor.py
                             Date: 2026/01/28
-                        Version: 0.1-2026.02.02
+                        Version: 1.8.1-2026.02.05
 
 ===============================================================================
 
@@ -28,10 +28,13 @@
 """
 
 
-import psutil
+# ~ Import Standard Modules. ~ #l
 import json
 import subprocess
 from datetime import datetime
+
+# ~ Import Third-Party Modules. ~ #
+import psuti
 
 
 def get_cpu_info():
@@ -39,7 +42,7 @@ def get_cpu_info():
     ~ Get the percentage, core count and load average. ~
 
     Return:
-        - dict                         : The CPU information.
+        - Dict                         : The CPU information.
     """
 
     return {
@@ -53,7 +56,7 @@ def get_memory_info():
     """
     ~ Get the total, available and used percentage. ~
     Return:
-        - dict                         : The memory information.
+        - Dict                         : The memory information.
     """
 
     return {
@@ -69,9 +72,9 @@ def get_storage_info():
     ~ Get the path, total GB, free GB and filesystem type. ~
 
     Return:
-        - dict                         : The storage information.
+        - Dict                         : The storage information.
     """
-    # Get root disk usage info
+    
     root_disk_usage = psutil.disk_usage('/')
 
     fs_type = None
@@ -82,8 +85,10 @@ def get_storage_info():
             fs_type = part.fstype
             path = part.mountpoint
             break
+
     if path is None:
         path = '/'
+
     if fs_type is None:
         fs_type = "unknown"
 
@@ -101,12 +106,12 @@ def get_status(cpu_info, memory_info, storage_info):
     ~ Get the status of the system. ~
 
     Arguments:
-        - cpu_info             (dict) : The CPU information.
-        - memory_info          (dict) : The memory information.
-        - storage_info         (dict) : The storage information.
+        - cpu_info             (Dict) : The CPU information.
+        - memory_info          (Dict) : The memory information.
+        - storage_info         (Dict) : The storage information.
 
     Return:
-        - str                          : The status of the system.
+        - String                      : The status of the system.
     """
 
     current_status = "online"
@@ -141,7 +146,7 @@ def get_system_info():
     ~ Get the information for the system. ~
 
     Return:
-        - dict                         : The information or an error dict.
+        - Dict                         : The information or an error dict.
     """
     try:
         cpu_info = get_cpu_info()
@@ -155,6 +160,7 @@ def get_system_info():
             "storage": storage_info,
             "status": status
         }
+
     except Exception as e:
         return {
             "timestamp": datetime.now().isoformat(),
@@ -164,6 +170,7 @@ def get_system_info():
             "status": "error",
             "error": str(e)
         }
+
 
 if __name__ == "__main__":
     print(get_storage_info())

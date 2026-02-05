@@ -1,11 +1,11 @@
 """
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
-                        Program Name: Live Translate.
-      Description: A helpful AI Assistent that act as the host device.
+                        Program Name: SpudNet.
+      Description: A helpful AI Assistant that act as the host device.
                              File: vocal.py
                             Date: 2026/01/28
-                        Version: 0.1-2026.02.02
+                        Version: 1.8.1-2026.02.05
 
 ===============================================================================
 
@@ -28,12 +28,18 @@
 """
 
 
+# ~ Import Standard Modules. ~ #
 import asyncio
-import httpx
 import json
 
+# ~ Import Third-Party Modules. ~ #
+import httpx
+
+
+# ~ Create the global constant variables. ~ #
 MODEL = "SpudNet-Vocal:latest"
 OLLAMA_API_BASE_URL = "http://localhost:11434/api/generate"
+
 
 async def async_talk(msg):
     """
@@ -42,6 +48,7 @@ async def async_talk(msg):
     Returns: 
         - String                       : The response or an error.
     """
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -51,7 +58,7 @@ async def async_talk(msg):
                     "prompt": msg,
                     "stream": True
                 },
-                timeout=None  # Disable timeout for long-running LLM calls
+                timeout=None
             )
             response.raise_for_status()
 
@@ -62,17 +69,23 @@ async def async_talk(msg):
 
                 while '\n' in json_buffer:
                     line, json_buffer = json_buffer.split('\n', 1)
+                    
                     if line.strip():
                         try:
                             chunk_data = json.loads(line)
                             if "response" in chunk_data:
                                 yield chunk_data["response"]
+
                         except json.JSONDecodeError:
                             pass
     
     except httpx.RequestError as e:
-        yield f"[SpudNet error] HTTP Request failed: {e}"
+        yield f"[SpudNet Error] HTTP Request failed: {e}"
+
     except httpx.HTTPStatusError as e:
-        yield f"[SpudNet error] HTTP Status Error: {e.response.status_code} - {e.response.text}" 
+        error = e.response.text
+        error_code = e.response.status_code
+        yield f"[SpudNet Error] HTTP Status Error: {error_code} - {error}"
+
     except Exception as e:
-        yield f"[SpudNet error] Could not reach Ollama or process response: {e}"
+        yield f"[SpudNet Error] Received the foolowin error: {e}"

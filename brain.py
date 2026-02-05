@@ -1,11 +1,11 @@
 """
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
-                        Program Name: Live Translate.
-      Description: A helpful AI Assistent that act as the host device.
+                        Program Name: SpudNet.
+      Description: A helpful AI Assistant that act as the host device.
                              File: brain.py
                             Date: 2026/02/04
-                        Version: 1.1-2026.02.04
+                        Version: 1.8.1-2026.02.05
 
 ===============================================================================
 
@@ -28,27 +28,40 @@
 """
 
 
+# ~ Import Third-Party Modules. ~ #
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+# ~ Import Local Modules. ~ #
 import system_monitor
 import vocal
 import database
 
 
-app = FastAPI(title="SpudNet Brain", version="1.1")
+# ~ Initialize global constants. ~ #
+APP = FastAPI(title="SpudNet Brain", version="1.1")
 
 
 class ChatRequest(BaseModel):
+    """
+    ~ Pydantic validator for the user message. ~
+
+    Attributes:
+        message               (String) : The message sent from the user.
+    """
+
     message: str
 
 
-@app.get('/status')
+@APP.get('/status')
 async def get_system_status():
     """
     ~ Get the status and log it for trend analysis. ~
+
+    Returns:
+        String                         : The status of the device.
     """
 
     stats = system_monitor.get_system_info()
@@ -57,13 +70,31 @@ async def get_system_status():
     return stats
 
 
-@app.post('/chat')
+@APP.post('/chat')
 async def chat_stream(request: ChatRequest):
     """
     ~ Streams responses and saves conversations to DB upon completion. ~
+
+    Arguments:
+        request          (ChatRequest) : An object containing the 
+                                         message from the user.
+
+    Functions:
+        saving_generator               : Takes the message and and saves the 
+                                         message and its reply in the database.
+
+    Returns:
+        StreamingResponse              : The streamed response from the LLM.
     """
 
     async def saving_generator(msg):
+        """
+        ~ The function to save the conversation in the database. ~
+
+        Arguments:
+            msg                        : The message from the user.
+        """
+        
         full_response = ""
 
         async for chunk in vocal.async_talk(msg):
@@ -75,10 +106,13 @@ async def chat_stream(request: ChatRequest):
     return StreamingResponse(saving_generator(request.message), media_type="text/plain")
 
 
-@app.get('/history')
+@APP.get('/history')
 async def get_history():
     """
     ~ Retrieve the last 10 snapshots and conversations. ~
+
+    Returns:
+        Dict                           : The history of the information saved.
     """
 
     return {
@@ -88,9 +122,14 @@ async def get_history():
 
 
 if __name__ == "__main__":
-    print(">>> SpudNet Brain Online at http://127.0.0.1:42069")
+    # ~ Check if Ollama is running. ~ #
+    # Maybe add a background daemon or something to ensure
+    # the vocal model is able to speak. Could also implement this
+    # in the vocal module itself since that is what requires it.
 
+    # ~ Run the brains API Server at 127.0.0.1:42069 and catch errors. ~ #
+    print(">>> SpudNet Brain Online at http://127.0.0.1:42069")
     try:
-        uvicorn.run(app, host="127.0.0.1", port=42069, log_level="info")
+        uvicorn.run(APP, host="127.0.0.1", port=42069, log_level="info")
     except Exception as e:
         print(f"There has been an error: {e}")

@@ -1,11 +1,11 @@
 """
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
-                        Program Name: Live Translate.
-      Description: A helpful AI Assistent that act as the host device.
+                        Program Name: SpudNet.
+      Description: A helpful AI Assistant that act as the host device.
                             File: database.py
                             Date: 2026/02/04
-                        Version: 0.1-2026.02.04
+                        Version: 1.8.1-2026.02.05
 
 ===============================================================================
 
@@ -28,16 +28,22 @@
 """
 
 
+# ~ Standard Library Imports ~ #
 import sqlite3
 import json
 from datetime import datetime
 
 
+# ~ Create the database file constant. ~ #
 DB_FILE = "spudnet.db"
+
 
 def get_connection():
     """
-    ~ Establshes a connection to the SQLite database. ~
+    ~ Establish a connection to the SQLite database. ~
+
+    Return:
+        - sqlite3.Connection           : The database connection object.
     """
 
     return sqlite3.connect(DB_FILE)
@@ -45,7 +51,7 @@ def get_connection():
 
 def init_db():
     """
-    ~ Initializes the database tables if they do not exist. ~
+    ~ Initialize the database tables if they do not exist. ~
     """
 
     conn = get_connection()
@@ -70,12 +76,16 @@ def init_db():
 
     conn.commit()
     conn.close()
+
     print(f"Database {DB_FILE} initialized!")
 
 
 def log_system_stats(stats_dict):
     """
-    ~ Saves the get_system_info() dictionary as a JSON string. ~
+    ~ Save the get_system_info() dictionary as a JSON string to the database. ~
+
+    Arguments:
+        - stats_dict            (Dict) : The system information dictionary.
     """
 
     conn = get_connection()
@@ -92,22 +102,35 @@ def log_system_stats(stats_dict):
 
 def log_chat(user_msg, spudnet_msg):
     """
-    ~ Logs a conversation pair. ~
+    ~ Log a conversation message pair to the database. ~
+
+    Arguments:
+        - user_msg            (String) : The user's message.
+        - spudnet_msg         (String) : The SpudNet response.
     """
 
     conn = get_connection()
     timestamp = datetime.now().isoformat()
+    command = "INSERT INTO conversations \
+                (timestamp, user_msg, spudnet_msg) \
+                VALUES (?, ?, ?)",
 
     with conn:
         conn.execute(
-            "INSERT INTO conversations (timestamp, user_msg, spudnet_msg) VALUES (?, ?, ?)",
+            command,
             (timestamp, user_msg, spudnet_msg)
         )
 
 
 def get_recent_metrics(limit=10):
     """
-    ~ Retrieves the last N hardware snapshots. ~
+    ~ Retrieve the most recent N hardware metrics snapshots. ~
+
+    Arguments:
+        - limit                  (Int) : Maximum number of rows to return.
+
+    Return:
+        - List[Dict]                   : List of hardware metrics dictionaries.
     """
 
     conn = get_connection()
@@ -126,14 +149,21 @@ def get_recent_metrics(limit=10):
 
 def get_recent_conversations(limit=20):
     """
-    ~ Retrieves the last N chat pairs. ~
+    ~ Retrieve the most recent N conversation message pairs. ~
+
+    Arguments:
+        - limit                  (Int) : Maximum number of rows to return.
+
+    Return:
+        - List[Dict]                   : List of chat pair dictionaries.
     """
 
     conn = get_connection()
     cursor = conn.cursor()
-
+    command = "SELECT timestamp, user_msg, spudnet_msg \
+                FROM conversations ORDER BY id DESC LIMIT ?"
     cursor.execute(
-        "SELECT timestamp, user_msg, spudnet_msg FROM conversations ORDER BY id DESC LIMIT ?",
+        command,
         (limit,)
     )
 
@@ -141,6 +171,7 @@ def get_recent_conversations(limit=20):
     conn.close()
 
     return [{"timestamp": r[0], "user": r[1], "spudnet": r[2]} for r in rows]
+
 
 if __name__ == "__main__":
     init_db()

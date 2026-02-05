@@ -106,10 +106,17 @@
 * 16:33
     - Renamed `server.py` to `brain.py` for a more "alive" feel.
 
+* 16:47
+    - Updated the README to include more robust installation
+      instructions and minor visual edits.
+
+* 20:50
+    - Finished writing docstrings and some comment.
+    - Need to add more comments.
+    - Some parts could possibly benefit from a custom method.
+
 
 ### TO-DO
 [!] Recall information from the database.
-[!] Update the README for proper installation and reflection
-    of changes if need be.
-[!] Have the server check if the ollama server is running.
+[!] Have the brain check if the ollama server is running.
     If not, start it up.

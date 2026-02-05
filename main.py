@@ -1,11 +1,11 @@
 """
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Company: SpudWorks.
-                        Program Name: Live Translate.
-      Description: A helpful AI Assistent that act as the host device.
+                        Program Name: SpudNet.
+      Description: A helpful AI Assistant that act as the host device.
                               File: main.py
                             Date: 2026/01/28
-                        Version: 0.1-2026.02.02
+                        Version: 1.8.1-2026.02.05
 
 ===============================================================================
 
@@ -28,18 +28,88 @@
 """
 
 
+# ~ Import Standard Modules. ~ #
 import asyncio
 import json
-from blessed import Terminal
-from time import sleep
-import httpx
-import textwrap
 import os
 import sys
+from time import sleep
+import textwrap
+
+# ~ Import Third-Party Modules. ~ #
+from blessed import Terminal
+import httpx
 
 
 class SpudNet:
+    """
+    ~ Main interface and orchestrator for the SpudNet Assistant: 
+      manages application state, user interaction, terminal UI rendering, 
+      and LLM communication. ~
+
+    Functions:
+        - __init__            : Initialize interface, application state,
+                                and API client.
+        - get_system_info     : Asynchronously retrieve current system
+                                status from API.
+        - create_menu         : Draw menu UI in the terminal and return
+                                cursor position.
+        - render_title        : Display application title at the top of
+                                the terminal.
+        - render              : Render the UI and update positions.
+        - run_command         : Run system or SpudNet-specific commands.
+        - _msg_zone_bottom    : Get row index just below the message area
+                                separator.
+        - _visible_line_count : Calculate visible message rows for 
+                                display area.
+        - break_message       : Split a message into wrapped lines for 
+                                display width.
+        - _display_len        : Get display length of a given text.
+        - _all_message_lines  : Return all messages as 
+                                (speaker, color, line) tuples.
+        - render_messages     : Render all current messages to terminal
+                                display.
+        - _scroll_to_bottom   : Keep scroll offset at bottom after new
+                                messages.
+        - add_message         : Add user message to chat log and trigger 
+                                LLM response.
+        - _get_llm_response   : Get LLM response for a user message
+                                asynchronously.
+        - execute             : Run the main program event loop and handle
+                                UI updates.
+    """
+
     def __init__(self):
+        """
+        ~ Initializes SpudNet main interface: sets up app state,
+          terminal UI, message log, async client, and core attributes. ~
+
+        Attributes:
+            - messages          (List) : Stores chat messages between user
+                                           and SpudNet.
+            - welcome            (Str) : Welcome message/title for the
+                                           application.
+            - term  (blessed.Terminal) : Terminal UI handler for display/
+                                           output.
+            - pos              (Tuple) : Cursor/origin pos for rendering/UI.
+            - scroll_offset      (Int) : Message lines scrolled up for
+                                           history view.
+            - _last_rendered_lines
+                                (List) : Tracks last lines printed for
+                                           redraw optimization.
+            - _last_system_snapshot
+                                (Dict) : Caches last fetched system info/
+                                           status.
+            - _last_snapshot_time
+                               (Float) : Time of last system snapshot
+                                           retrieval.
+            - api_url            (Str) : Base URL for internal API server.
+            - llm_response_queue
+                       (asyncio.Queue) : Queue for LLM streaming responses.
+            - client 
+                   (httpx.AsyncClient) : Async HTTP client for backend/API.
+        """
+
         self.messages = []
         self.welcome = "Welcome to SpudTerminal!"
         self.term = Terminal()
@@ -53,6 +123,13 @@ class SpudNet:
         self.client = httpx.AsyncClient(timeout=None)
 
     async def get_system_info(self):
+        """
+        ~ Get latest system status from API asynchronously. ~
+
+        Returns:
+            - Dict                     : API system status or error dict.
+        """
+
         try:
             response = await self.client.get(f"{self.api_url}/status")
             response.raise_for_status()
@@ -66,6 +143,14 @@ class SpudNet:
             return {"error": f"A general exception has occured: {e}"}
 
     def create_menu(self):
+        """
+        ~ Draws the main menu UI and returns cursor position. ~
+
+        Returns:
+            - Tuple                    : (X, Y) coordinates for text cursor
+                                         in menu.
+        """
+
         x, y = 1, self.term.height-self.term.height//3
 
         print(self.term.clear)
@@ -85,15 +170,30 @@ class SpudNet:
         return (x, y)
 
     def render_title(self):
+        """
+        ~ Renders the title at the top of the terminal window. ~
+        """
+
         x = (self.term.width // 2) - (len(self.welcome) // 2)
         y = 1
         print(self.term.move_yx(y, x) + self.welcome)
 
     def render(self):
+        """
+        ~ Renders the UI and updates positions. ~
+        """
+
         self.pos = self.create_menu()
         self.render_title()
 
     def run_command(self, cmd):
+        """
+        ~ Runs system or SpudNet-specific commands. ~
+
+        Arguments:
+            - cmd             (String) : The command to run.
+        """
+        
         if cmd == "/clear":
             self.render()
             return
@@ -106,27 +206,63 @@ class SpudNet:
 
     def _msg_zone_bottom(self):
         """
-        ~ First row below the message area (input separator row). ~
+        ~ Gets row index just below message area separator. ~
+
+        Returns:
+            - Integer                  : Row index for input prompt start.
         """
+        
         return self.term.height - (self.term.height // 3)
 
     def _visible_line_count(self):
         """
-        ~ Number of rows available for messages (clipped to zone). ~
+        ~ Calculates visible message rows for the message display area. ~
+
+        Returns:
+            - Integer                  : Number of rows available for messages.
         """
+        
         return max(0, self._msg_zone_bottom() - 3)
 
     def break_message(self, speaker, full_msg):
+        """
+        ~ Splits a message into wrapped lines for display width. ~
+
+        Arguments:
+            - speaker         (String) : The message prefix speaker label.
+            - full_msg        (String) : The message content.
+
+        Returns:
+            - List                     : Wrapped lines as a list of strings.
+        """
+
         max_line_len = self.term.width - (3 + len(speaker))
-        lines = textwrap.wrap(full_msg, max_line_len, break_long_words=False, replace_whitespace=True)
+        lines = textwrap.wrap(
+            full_msg, max_line_len, 
+            break_long_words=False, replace_whitespace=True
+        )
+
         return lines
 
     def _display_len(self, text):
+        """
+        ~ Gets display length of text. ~
+
+        Arguments:
+            - text            (String) : The text to measure.
+
+        Returns:
+            - Integer                  : The display width of the text.
+        """
+        
         return len(text)
 
     def _all_message_lines(self):
         """
-        ~ Flatten messages into (speaker, color, line) for each logical line. ~
+        ~ Returns all messages as (speaker, color, line) tuples. ~
+
+        Returns:
+            - List                     : (speaker, color tuple, message line)
         """
         
         lines = []
@@ -134,11 +270,17 @@ class SpudNet:
         for msg in self.messages:
             speaker = msg["speaker"]
             color = (255, 0, 0) if speaker == "User: " else (255, 20, 147)
+
             for line in msg["msg"]:
                 lines.append((speaker, color, line))
+
         return lines
 
     def render_messages(self):
+        """
+        ~ Renders all current messages to the terminal display. ~
+        """
+        
         all_lines = self._all_message_lines()
         total_lines = len(all_lines)
         visible_count = self._visible_line_count()
@@ -162,7 +304,8 @@ class SpudNet:
                 
             is_first_line = i == 0 or all_lines[i - 1][0] != speaker
             if is_first_line:
-                prefix = self.term.normal + speaker + self.term.color_rgb(*color)
+                prefix = self.term.normal + speaker 
+                prefix += self.term.color_rgb(*color)
                 max_line_len = self.term.width - 2 - len(speaker)
             else:
                 prefix = self.term.color_rgb(*color)
@@ -174,7 +317,7 @@ class SpudNet:
 
     def _scroll_to_bottom(self):
         """
-        ~ Keep scroll at bottom (e.g. after new messages). ~
+        ~ Keep scroll offset at bottom after new messages. ~
         """
         
         total = len(self._all_message_lines())
@@ -182,25 +325,48 @@ class SpudNet:
         self.scroll_offset = max(0, total - visible)
 
     def add_message(self, full_msg):
+        """
+        ~ Add a user message to the chat log and trigger LLM response. ~
+
+        Arguments:
+            - full_msg        (String) : The message text input by the user.
+        """
+
         if full_msg.startswith("/"):
             self.run_command(full_msg)
+            # Future will return response and use for reply.
             return
 
-        self.messages.append({"speaker": "User: ", "msg": self.break_message("User: ", full_msg)})
+        self.messages.append({
+            "speaker": "User: ", 
+            "msg": self.break_message("User: ", full_msg)
+        })
         self._scroll_to_bottom()
         self.render_messages()
 
         asyncio.create_task(self._get_llm_response(full_msg))
 
     async def _get_llm_response(self, user_msg):
+        """
+        ~ Get the LLM response for a user message. ~
+        
+        Arguments:
+            - user_msg        (String) : The message from the user to 
+                                         send to LLM.
+        """
+
         try:
             # Cache system info, update every 5 seconds
             current_time = asyncio.get_event_loop().time()
-            if self._last_system_snapshot is None or (current_time - self._last_snapshot_time) > 5:
+            delta_time = (current_time - self._last_snapshot_time)
+            if self._last_system_snapshot is None or delta_time > 5:
                 self._last_system_snapshot = await self.get_system_info()
                 self._last_snapshot_time = current_time
             
-            full_msg_with_snapshot = f"[SYSTEM_SNAPSHOT]: {json.dumps(self._last_system_snapshot)}\n[USER]: {user_msg}"
+            snap = json.dumps(self._last_system_snapshot)
+            snap_msg = f"[SYSTEM_SNAPSHOT]: {snap}"
+            user_msg = f"[USER]: {user_msg}"
+            full_msg_with_snapshot = f"{snap_msg}\n{user_msg}"
 
             async with self.client.stream(
                 "POST",
@@ -209,26 +375,34 @@ class SpudNet:
                 }) as response:
 
                 if response.status_code != 200:
-                    await self.llm_response_queue.put(f"[SpudNet Error] Server returned {response.status_code}")
+                    err_code = response.status_code
+                    error = f"[SpudNet Error] Server returned {err_code}"
+                    await self.llm_response_queue.put(error)
                     return
 
                 async for chunk in response.aiter_bytes():
                     if chunk:
                         decoded_chunk = chunk.decode("utf-8")
-                        await self.llm_response_queue.put(decoded_chunk) # Send individual chunks for real-time display
+                        await self.llm_response_queue.put(decoded_chunk)
 
         except httpx.RequestError as re:
-            await self.llm_response_queue.put(f"[SpudNet Error] httpx request error: {re}")
+            re_error = f"[SpudNet Error] httpx request error: {re}"
+            await self.llm_response_queue.put(re_erro)
 
         except httpx.HTTPStatusError as se:
-            await self.llm_response_queue.put(f"[SpudNet Error] httpx status error: {se}")
+            se_error =f"[SpudNet Error] httpx status error: {se}"
+            await self.llm_response_queue.put(se_error)
 
         except Exception as e:
-            await self.llm_response_queue.put(f"[SpudNet Error] {e if str(e) else 'An unknown error occurred.'}")
+            error = e if str(e) else 'An unknown error occurred.'
+            error_msg = f"[SpudNet Error] {error}"
+            await self.llm_response_queue.put(error_msg)
         
-        #await self.llm_response_queue.put(reply)
-
     async def execute(self):
+        """
+        ~ Runs the main program event loop and handles UI updates. ~
+        """
+
         with self.term.fullscreen(), self.term.cbreak():
             input_buffer = ""
             lastwidth, last_height = self.term.width, self.term.height
@@ -240,40 +414,56 @@ class SpudNet:
                 # Process LLM responses from the queue
                 while not self.llm_response_queue.empty():
                     reply_chunk = await self.llm_response_queue.get()
+                    speaker = self.messages[-1]["speaker"]
 
-                    # If the last message is from SpudNet, append the chunk to it
-                    if self.messages and self.messages[-1]["speaker"] == "SpudNet: ":
-                        # Use a 'raw' key to store the un-wrapped text for clean appending
+                    if self.messages and speaker == "SpudNet: ":
                         if "raw" not in self.messages[-1]:
-                            self.messages[-1]["raw"] = "".join(self.messages[-1]["msg"])
+                            msg = "".join(self.messages[-1]["msg"])
+                            self.messages[-1]["raw"] = msg
                         
                         self.messages[-1]["raw"] += reply_chunk
-                        self.messages[-1]["msg"] = self.break_message("SpudNet: ", self.messages[-1]["raw"])
+                        raw = self.messages[-1]["raw"]
+                        self.messages[-1]["msg"] = self.break_message(
+                                                        "SpudNet: ", 
+                                                        raw
+                                                    )
                     else:
-                        # Otherwise, create the first entry for this response
                         self.messages.append({
                             "speaker": "SpudNet: ", 
-                            "msg": self.break_message("SpudNet: ", reply_chunk),
+                            "msg": self.break_message(
+                                        "SpudNet: ", 
+                                        reply_chunk
+                                    ),
                             "raw": reply_chunk
                         })
 
                     self._scroll_to_bottom()
                     self.render_messages()
-                    # Re-render the input line and reposition the cursor after an LLM response
-                    scrolled_input = input_buffer[-input_display_length:]
-                    cursor_x = self.pos[0] + self._display_len(scrolled_input)
-                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + scrolled_input + self.term.normal + " " * (input_display_length - self._display_len(scrolled_input)), end="")
-                    print(self.term.move_yx(self.pos[1], cursor_x), end="", flush=True)
+                    
+                    scrolled = input_buffer[-input_display_length:]
+                    cursor_x = self.pos[0] + self._display_len(scrolled)
+                    print(
+                        self.term.move_yx(self.pos[1], 
+                        self.pos[0]) + self.term.color_rgb(255, 0, 0) + 
+                        scrolled + self.term.normal + " " * 
+                        (input_display_length - self._display_len(scrolled)),
+                        end=""
+                    )
+                    print(
+                        self.term.move_yx(self.pos[1], cursor_x), 
+                        end="", flush=True
+                    )
 
                 input_display_length = self.term.width - 10
+                cur_size = (self.term.width, self.term.height)
 
-                if (self.term.width, self.term.height) != (lastwidth, last_height):
+                if cur_size != (lastwidth, last_height):
                     lastwidth, last_height = self.term.width, self.term.height
 
                     self.render()
                 
                 key = self.term.inkey(timeout=0.5)
-                await asyncio.sleep(0) # Allow other async tasks to run
+                await asyncio.sleep(0)
 
                 if key.code == self.term.KEY_ESCAPE:
                     break
@@ -282,16 +472,37 @@ class SpudNet:
                     visible = self._visible_line_count()
                     self.scroll_offset = max(0, self.scroll_offset - visible)
                     self.render_messages()
-                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + input_buffer[-input_display_length:] + self.term.normal + " ", end="")
-                    print(self.term.move_yx(self.pos[1], self.pos[0] + len(input_buffer[-input_display_length:])), end="", flush=True)
+                    print(
+                        self.term.move_yx(self.pos[1], self.pos[0]) + 
+                        self.term.color_rgb(255, 0, 0) + 
+                        input_buffer[-input_display_length:] +
+                        self.term.normal + " ", 
+                        end=""
+                    )
+                    print(
+                        self.term.move_yx(self.pos[1], self.pos[0] + 
+                        len(input_buffer[-input_display_length:]))
+                        , end="", flush=True
+                    )
                     continue
                 if key.code == self.term.KEY_PGDOWN:
                     visible = self._visible_line_count()
                     total = len(self._all_message_lines())
-                    self.scroll_offset = min(max(0, total - visible), self.scroll_offset + visible)
+                    self.scroll_offset = min(max(0, total - visible), 
+                                                self.scroll_offset + visible)
                     self.render_messages()
-                    print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + input_buffer[-input_display_length:] + self.term.normal + " ", end="")
-                    print(self.term.move_yx(self.pos[1], self.pos[0] + len(input_buffer[-input_display_length:])), end="", flush=True)
+                    print(
+                        self.term.move_yx(self.pos[1], self.pos[0]) + 
+                        self.term.color_rgb(255, 0, 0) + 
+                        input_buffer[-input_display_length:] + 
+                        self.term.normal + " ", 
+                        end=""
+                    )
+                    print(
+                        self.term.move_yx(self.pos[1], self.pos[0] + 
+                        len(input_buffer[-input_display_length:])), 
+                        end="", flush=True
+                    )
                     continue
                 if key.code == self.term.KEY_ENTER:
                     loc_y, loc_x = self.term.get_location()
@@ -299,7 +510,8 @@ class SpudNet:
                     
                     self.add_message(input_buffer)
 
-                    print(self.term.move_xy(self.pos[0], self.pos[1]) + " " * chars)
+                    print(self.term.move_xy(
+                            self.pos[0], self.pos[1]) + " " * chars)
 
                     input_buffer = ""
 
@@ -315,18 +527,28 @@ class SpudNet:
                         input_buffer = input_buffer[:-1]
                         erase_x = self.pos[0] + (display_len - 1)
 
-                        print(self.term.move_yx(self.pos[1], erase_x) + " ", end="", flush=True)
+                        print(
+                            self.term.move_yx(self.pos[1], erase_x)
+                            + " ", end="", flush=True
+                        )
 
                     continue
 
                 if key and not key.is_sequence:
                     input_buffer += key
 
-                scrolled_input = input_buffer[-input_display_length:]
-                cursor_x = self.pos[0] + self._display_len(scrolled_input)
+                scrolled = input_buffer[-input_display_length:]
+                cursor_x = self.pos[0] + self._display_len(scrolled)
 
-                print(self.term.move_yx(self.pos[1], self.pos[0]) + self.term.color_rgb(255, 0, 0) + scrolled_input + self.term.normal + " ", end="")
-                print(self.term.move_yx(self.pos[1], cursor_x), end="", flush=True)
+                print(
+                    self.term.move_yx(self.pos[1], self.pos[0]) + 
+                    self.term.color_rgb(255, 0, 0) + scrolled + 
+                    self.term.normal + " ", end=""
+                )
+                print(
+                    self.term.move_yx(self.pos[1], cursor_x),
+                    end="", flush=True
+                )
     
 
 if __name__ == '__main__':
