@@ -48,7 +48,7 @@ class SpudNet:
         self._last_rendered_lines = []
         self._last_system_snapshot = None
         self._last_snapshot_time = 0
-        self.api_url = "http://127.0.0.1:8000"
+        self.api_url = "http://127.0.0.1:42069"
         self.llm_response_queue = asyncio.Queue()
         self.client = httpx.AsyncClient(timeout=None)
 
