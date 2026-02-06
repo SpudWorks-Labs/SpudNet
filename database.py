@@ -121,6 +121,8 @@ def log_chat(user_msg, spudnet_msg):
             (timestamp, user_msg, spudnet_msg)
         )
 
+    conn.close()
+
 
 def get_recent_metrics(limit=10):
     """
