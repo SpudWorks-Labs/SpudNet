@@ -145,7 +145,13 @@
     - Increased latency issue due to an increased amount of tokens
       that need to be sent to the model.
 
+* 21:52
+    - Latency updates can include:
+        * Inject necessary data when the user asks.
+        * Shorten the context history.
+
 
 ### TO-DO
+[!!!] Lower the LLM latency.
 [!] Have the brain check if the ollama server is running.
     If not, start it up.
