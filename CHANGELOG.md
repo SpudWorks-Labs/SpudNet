@@ -115,8 +115,23 @@
     - Need to add more comments.
     - Some parts could possibly benefit from a custom method.
 
+* 04:38
+    - Testing the memory of SpudNet.
+
+* 04:44
+    - I really need to look into lowering LLM Latency on a CPU.
+
+* 05:40
+    - Memory recalling did not work.
+
+* 05:45
+    - Testing memory again.
+
+* 07:03
+    - Implemented a no timeout for reading the API response.
+
 
 ### TO-DO
-[!] Recall information from the database.
+[!] Recall information from the database. (IN-PROGRESS)
 [!] Have the brain check if the ollama server is running.
     If not, start it up.
