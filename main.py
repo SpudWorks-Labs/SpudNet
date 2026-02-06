@@ -362,11 +362,32 @@ class SpudNet:
             if self._last_system_snapshot is None or delta_time > 5:
                 self._last_system_snapshot = await self.get_system_info()
                 self._last_snapshot_time = current_time
-            
+
+            hist = None
+            try:
+                response = await self.client.get(f"{self.api_url}/history")
+                response.raise_for_status()
+
+                hist = response.json().get("chat_history")
+
+            except httpx.RequestError as re:
+                re_error = f"[SpudNet Error] httpx request error: {re}"
+                await self.llm_response_queue.put(re_error)
+
+            except httpx.HTTPStatusError as se:
+                se_error =f"[SpudNet Error] httpx status error: {se}"
+                await self.llm_response_queue.put(se_error)
+
+            except Exception as e:
+                error = e if str(e) else 'An unknown error occurred.'
+                error_msg = f"[SpudNet Error] {error}"
+                await self.llm_response_queue.put(error_msg)
+
             snap = json.dumps(self._last_system_snapshot)
             snap_msg = f"[SYSTEM_SNAPSHOT]: {snap}"
+            history = f"[CHAT HISTORY]: {hist}"
             user_msg = f"[USER]: {user_msg}"
-            full_msg_with_snapshot = f"{snap_msg}\n{user_msg}"
+            full_msg_with_snapshot = f"{history}\n{snap_msg}\n{user_msg}"
 
             async with self.client.stream(
                 "POST",
