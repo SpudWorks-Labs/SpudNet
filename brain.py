@@ -43,6 +43,15 @@ import database
 # ~ Initialize global constants. ~ #
 APP = FastAPI(title="SpudNet Brain", version="1.1")
 
+@APP.on_event("startup")
+async def _startup():
+    """
+    ~ Ensure required resources exist on startup. ~
+    """
+
+    # Make sure the SQLite DB + tables exist before any endpoints use them.
+    database.init_db()
+
 
 class ChatRequest(BaseModel):
     """
@@ -96,12 +105,20 @@ async def chat_stream(request: ChatRequest):
         """
         
         full_response = ""
+        try:
+            async for chunk in vocal.async_talk(msg):
+                full_response += chunk
+                yield chunk
+        except Exception as e:
+            # Don't let generator exceptions hard-close the stream.
+            yield f"[SpudNet Error] brain stream generator failed: {type(e).__name__}: {e}"
+            return
 
-        async for chunk in vocal.async_talk(msg):
-            full_response += chunk
-            yield chunk
-
-        database.log_chat(msg, full_response)
+        try:
+            database.log_chat(msg, full_response)
+        except Exception as e:
+            # If DB logging fails, keep the response but report the failure.
+            yield f"[SpudNet Error] failed to log chat to DB: {type(e).__name__}: {e}"
 
     return StreamingResponse(saving_generator(request.message), media_type="text/plain")
 
