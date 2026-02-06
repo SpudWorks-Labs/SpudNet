@@ -120,7 +120,9 @@ class SpudNet:
         self._last_snapshot_time = 0
         self.api_url = "http://127.0.0.1:42069"
         self.llm_response_queue = asyncio.Queue()
-        self.client = httpx.AsyncClient(timeout=None)
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(300.0, read=None, connect=60.0)
+        )
 
     async def get_system_info(self):
         """
@@ -363,31 +365,40 @@ class SpudNet:
                 self._last_system_snapshot = await self.get_system_info()
                 self._last_snapshot_time = current_time
 
-            hist = None
-            try:
-                response = await self.client.get(f"{self.api_url}/history")
-                response.raise_for_status()
+            # Try to fetch chat history, but continue with empty history if it fails
+            # (History is currently not used in the prompt, so failures are non-critical)
+            hist = []
+            async with httpx.AsyncClient(timeout=10.0) as hist_client:
+                try:
+                    # Use a short timeout for history fetch since it's non-critical
+                    response = await hist_client.get(f"{self.api_url}/history")
+                    response.raise_for_status()
+                    raw = response.json().get("chat_history") or []
+                #     # Database returns newest-first; reverse for chronological context.
+                    hist = list(reversed(raw))
+                except Exception:
+                #     # Silently fail - history is optional and not currently used
+                    hist = []
 
-                hist = response.json().get("chat_history")
+            # Format as readable "User: ... SpudNet: ..." so the model can use context.
+            history_lines = []
+            for entry in hist:
+                u = entry.get("user") or ""
+                s = entry.get("spudnet") or ""
+                if u:
+                    history_lines.append(f"User: {u}")
+                if s:
+                    history_lines.append(f"SpudNet: {s}")
 
-            except httpx.RequestError as re:
-                re_error = f"[SpudNet Error] httpx request error: {re}"
-                await self.llm_response_queue.put(re_error)
-
-            except httpx.HTTPStatusError as se:
-                se_error =f"[SpudNet Error] httpx status error: {se}"
-                await self.llm_response_queue.put(se_error)
-
-            except Exception as e:
-                error = e if str(e) else 'An unknown error occurred.'
-                error_msg = f"[SpudNet Error] {error}"
-                await self.llm_response_queue.put(error_msg)
+            if history_lines:
+                history = "[CHAT HISTORY]:\n" + "\n".join(history_lines)
+            else:
+                history = "[CHAT HISTORY]: (none yet)"
 
             snap = json.dumps(self._last_system_snapshot)
             snap_msg = f"[SYSTEM_SNAPSHOT]: {snap}"
-            history = f"[CHAT HISTORY]: {hist}"
             user_msg = f"[USER]: {user_msg}"
-            full_msg_with_snapshot = f"{history}\n{snap_msg}\n{user_msg}"
+            full_msg_with_snapshot = f"{snap_msg}\n{user_msg}"
 
             async with self.client.stream(
                 "POST",
@@ -401,23 +412,80 @@ class SpudNet:
                     await self.llm_response_queue.put(error)
                     return
 
-                async for chunk in response.aiter_bytes():
-                    if chunk:
-                        decoded_chunk = chunk.decode("utf-8")
-                        await self.llm_response_queue.put(decoded_chunk)
+                try:
+                    async for chunk in response.aiter_bytes():
+                        if chunk:
+                            decoded_chunk = chunk.decode("utf-8")
+                            await self.llm_response_queue.put(decoded_chunk)
+                except httpx.ReadError as read_err:
+                    # Stream was closed unexpectedly - likely server-side error
+                    error_msg = (
+                        "[SpudNet Error] Stream closed unexpectedly. "
+                        "Possible causes: Ollama not running (start with 'ollama serve'), "
+                        "model 'SpudNet-Vocal:latest' missing, or LLM generation error. "
+                        "Check brain.py server logs."
+                    )
+                    await self.llm_response_queue.put(error_msg)
+                    return
 
+        except httpx.ReadError as read_err:
+            # Stream read error - connection closed unexpectedly
+            error_msg = (
+                "[SpudNet Error] Stream read failed - connection closed unexpectedly. "
+                "Possible causes: Ollama not running (start with 'ollama serve'), "
+                "model 'SpudNet-Vocal:latest' missing, or LLM generation error. "
+                "Check brain.py server logs for details."
+            )
+            await self.llm_response_queue.put(error_msg)
+            
         except httpx.RequestError as re:
-            re_error = f"[SpudNet Error] httpx request error: {re}"
+            # Extract more details from the request error
+            error_type = type(re).__name__
+            error_details = []
+            
+            # Check for specific error types
+            if isinstance(re, httpx.ConnectError):
+                error_details.append("Cannot connect to API server")
+                error_details.append(f"URL: {self.api_url}")
+                error_details.append("Make sure 'python brain.py' is running")
+            elif isinstance(re, httpx.TimeoutException):
+                error_details.append("Request timed out")
+            else:
+                error_details.append(f"Request error ({error_type})")
+            
+            # Add URL if available
+            if hasattr(re, 'request') and re.request:
+                error_details.append(f"URL: {re.request.url}")
+            
+            # Add error message if available
+            error_str = str(re).strip()
+            if error_str:
+                error_details.append(error_str)
+            
+            # Add underlying cause if available
+            if hasattr(re, '__cause__') and re.__cause__:
+                cause_str = str(re.__cause__).strip()
+                if cause_str:
+                    error_details.append(f"Cause: {cause_str}")
+            
+            error_msg = " | ".join(error_details) if error_details else "Connection failed - is the API server running?"
+            re_error = f"[SpudNet Error] {error_msg}"
             await self.llm_response_queue.put(re_error)
 
         except httpx.HTTPStatusError as se:
-            se_error =f"[SpudNet Error] httpx status error: {se}"
+            status_msg = f"HTTP {se.response.status_code}"
+            if se.response.status_code == 404:
+                status_msg += " - Endpoint not found"
+            elif se.response.status_code == 500:
+                status_msg += " - Server error"
+            se_error = f"[SpudNet Error] {status_msg}: {se.request.url if hasattr(se, 'request') else 'Unknown URL'}"
             await self.llm_response_queue.put(se_error)
 
         except Exception as e:
-            error = e if str(e) else 'An unknown error occurred.'
-            error_msg = f"[SpudNet Error] {error}"
-            await self.llm_response_queue.put(error_msg)
+            error_type = type(e).__name__
+            error_msg = str(e) if str(e) else 'An unknown error occurred'
+            error_display = f"[SpudNet Error] {error_type}: {error_msg}"
+            await self.llm_response_queue.put(error_display)
         
     async def execute(self):
         """
