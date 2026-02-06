@@ -61,7 +61,7 @@ async def get_system_status():
     ~ Get the status and log it for trend analysis. ~
 
     Returns:
-        String                         : The status of the device.
+        Dict                           : The status of the device.
     """
 
     stats = system_monitor.get_system_info()
@@ -116,8 +116,8 @@ async def get_history():
     """
 
     return {
-        "hardware_history": database.get_recent_metrics(limit=10),
-        "chat_history": database.get_recent_chats(limit=10)
+        "hardware_history": database.get_recent_metrics(),
+        "chat_history": database.get_recent_chats()
     }
 
 
