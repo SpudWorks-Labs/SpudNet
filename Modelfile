@@ -1,6 +1,10 @@
 FROM qwen2.5:7b
 
 PARAMETER temperature 0.7
+PARAMETER num_ctx 2048
+PARAMETER num_thread 2
+PARAMETER f16_kv true
+PARAMETER use_mlock true
 PARAMETER stop "[User]:"
 PARAMETER stop "[SpudNet]:"
 

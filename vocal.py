@@ -56,7 +56,9 @@ async def async_talk(msg):
                 json={
                     "model": MODEL,
                     "prompt": msg,
-                    "stream": True
+                    "stream": True,
+                    "num_thread": 2,
+                    "num_ctx": 2048
                 },
                 timeout=None
             )
