@@ -113,7 +113,7 @@ def log_chat(user_msg, spudnet_msg):
     timestamp = datetime.now().isoformat()
     command = "INSERT INTO conversations \
                 (timestamp, user_msg, spudnet_msg) \
-                VALUES (?, ?, ?)",
+                VALUES (?, ?, ?)"
 
     with conn:
         conn.execute(
@@ -147,7 +147,7 @@ def get_recent_metrics(limit=10):
     return [json.loads(row[0]) for row in rows]
 
 
-def get_recent_conversations(limit=20):
+def get_recent_chats(limit=20):
     """
     ~ Retrieve the most recent N conversation message pairs. ~
 
