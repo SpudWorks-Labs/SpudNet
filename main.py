@@ -398,7 +398,7 @@ class SpudNet:
             snap = json.dumps(self._last_system_snapshot)
             snap_msg = f"[SYSTEM_SNAPSHOT]: {snap}"
             user_msg = f"[USER]: {user_msg}"
-            full_msg_with_snapshot = f"{snap_msg}\n{user_msg}"
+            full_msg_with_snapshot = f"{history}\n{snap_msg}\n{user_msg}"
 
             async with self.client.stream(
                 "POST",

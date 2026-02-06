@@ -130,8 +130,22 @@
 * 07:03
     - Implemented a no timeout for reading the API response.
 
+* 15:16
+    - Verifying the state of memory recalling.
+
+* 17:12
+    - Went back to review response, it failed to pass the test.
+
+* 17:26
+    - Forgot to append the history to the prompt.
+    - Now testing if that was the issue.
+
+* 17:36
+    - The memory seems to be functional.
+    - Increased latency issue due to an increased amount of tokens
+      that need to be sent to the model.
+
 
 ### TO-DO
-[!] Recall information from the database. (IN-PROGRESS)
 [!] Have the brain check if the ollama server is running.
     If not, start it up.
