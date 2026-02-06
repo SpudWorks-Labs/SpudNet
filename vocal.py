@@ -39,6 +39,7 @@ import httpx
 # ~ Create the global constant variables. ~ #
 MODEL = "SpudNet-Vocal:latest"
 OLLAMA_API_BASE_URL = "http://localhost:11434/api/generate"
+CLIENT = httpx.AsyncClient(timeout=None)
 
 
 async def async_talk(msg):
@@ -50,37 +51,33 @@ async def async_talk(msg):
     """
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                OLLAMA_API_BASE_URL,
-                json={
-                    "model": MODEL,
-                    "prompt": msg,
-                    "stream": True,
-                    "num_thread": 2,
-                    "num_ctx": 2048
-                },
-                timeout=None
-            )
+        request_body = {
+            "model": MODEL,
+            "prompt": msg,
+            "stream": True,
+            "num_thread": 2,
+            "num_ctx": 2048
+        }
+
+        async with CLIENT.stream("POST", OLLAMA_API_BASE_URL, json=request_body) as response:
             response.raise_for_status()
 
-            json_buffer = ""
             async for chunk_bytes in response.aiter_bytes():
-                chunk_str = chunk_bytes.decode('utf-8')
-                json_buffer += chunk_str
+                chunk_str = chunk_bytes.decode("utf-8")
 
-                while '\n' in json_buffer:
-                    line, json_buffer = json_buffer.split('\n', 1)
-                    
-                    if line.strip():
-                        try:
-                            chunk_data = json.loads(line)
-                            if "response" in chunk_data:
-                                yield chunk_data["response"]
+                if chunk_str.strip():
+                    try:
+                        for line in chunk_str.split('\n'):
+                            if not line.strip(): continue
 
-                        except json.JSONDecodeError:
-                            pass
-    
+                            data = json.loads(line)
+
+                            if "response" in data:
+                                yield data["response"]
+
+                    except json.JSONDecodeError:
+                        pass
+
     except httpx.RequestError as e:
         yield f"[SpudNet Error] HTTP Request failed: {e}"
 
@@ -90,4 +87,4 @@ async def async_talk(msg):
         yield f"[SpudNet Error] HTTP Status Error: {error_code} - {error}"
 
     except Exception as e:
-        yield f"[SpudNet Error] Received the foolowin error: {e}"
+        yield f"[SpudNet Error] Received general error: {e}"
