@@ -387,7 +387,7 @@ class SpudNet:
 
         except httpx.RequestError as re:
             re_error = f"[SpudNet Error] httpx request error: {re}"
-            await self.llm_response_queue.put(re_erro)
+            await self.llm_response_queue.put(re_error)
 
         except httpx.HTTPStatusError as se:
             se_error =f"[SpudNet Error] httpx status error: {se}"
