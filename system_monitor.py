@@ -34,7 +34,7 @@ import subprocess
 from datetime import datetime
 
 # ~ Import Third-Party Modules. ~ #
-import psuti
+import psutil
 
 
 def get_cpu_info():
