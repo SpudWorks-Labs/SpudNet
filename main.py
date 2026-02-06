@@ -33,8 +33,9 @@ import asyncio
 import json
 import os
 import sys
-from time import sleep
+from time import sleep, perf_counter
 import textwrap
+from datetime import datetime
 
 # ~ Import Third-Party Modules. ~ #
 from blessed import Terminal
@@ -393,6 +394,8 @@ class SpudNet:
             snap_msg = f"[SYSTEM_SNAPSHOT]: {snap}"
             user_msg = f"[USER]: {user_msg}"
             full_msg_with_snapshot = f"{history}\n{snap_msg}\n{user_msg}"
+            start_time = perf_counter()
+            current_time = asyncio.get_event_loop().time()
 
             async with self.client.stream(
                 "POST",
@@ -420,6 +423,14 @@ class SpudNet:
                     )
                     await self.llm_response_queue.put(error_msg)
                     return
+
+            end_time = perf_counter()
+            latency = end_time - start_time
+            timestamp = datetime().now().strftime("%Y-%m-%d %H:%M:%S")
+            log_entry = f"{timestamp} {latency:.4f}s | {user_msg.strip()} | {full_msg_with_snapshot.strip()}"
+
+            with open("latency.log", "a", encoding="utf-8") as f:
+                f.write(log_entry)
 
         except httpx.ReadError as read_err:
             error_msg = (
@@ -470,7 +481,7 @@ class SpudNet:
 
             elif se.response.status_code == 500:
                 status_msg += " - Server error"
-                
+
             se_error = f"[SpudNet Error] {status_msg}: {se.request.url if hasattr(se, 'request') else 'Unknown URL'}"
             await self.llm_response_queue.put(se_error)
 
